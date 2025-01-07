@@ -84,7 +84,7 @@ function App() {
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
       newDocumentContent = result.value; // 设置文档内容
-    } else if(file.type == 'application/pdf'){
+    } else if(file.type === 'application/pdf'){
       const text = await extractPdfText(file);
       newDocumentContent = text; // 设置文档内容
     } else {
@@ -141,7 +141,7 @@ function App() {
       return;
     }
 
-    if (selected_subject_id == 0){
+    if (selected_subject_id === 0){
       alert('请选择一个主题！');
       return;
     }
