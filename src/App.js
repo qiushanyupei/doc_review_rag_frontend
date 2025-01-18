@@ -100,7 +100,8 @@ function App() {
     setDocumentContent(newDocumentContent);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/upload', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      const response = await fetch(`${apiUrl}/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentContent: newDocumentContent }),
@@ -149,7 +150,8 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/query', {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      const response = await fetch(`${apiUrl}/query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question,Id: selected_subject_id     }),
@@ -172,7 +174,8 @@ function App() {
   //用于每隔5秒获取数据库更新好的主题信息
   useEffect(() => {
     const interval = setInterval(() => {
-      axios.get('http://localhost:5000/subjects')
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      axios.get(`${apiUrl}/subjects`)
         .then(response => {
           setSubjects(response.data);
           console.log('Request success');
@@ -324,12 +327,19 @@ function App() {
           >
             <Typography variant="body2" color="textSecondary">
               {/* 渲染从数据库获取的主题列表 */}
+              {/* 主题列表中每个主题渲染为一个Box嵌套Button */}
               {subjects?.map((subject) => (
                 <Box key={subject.id} mb={2}>
+                  {/* mb是指margin bottom */}
                   <Button 
-                    variant={selected_subject_id === subject.id ? "contained" : "outlined"} // 根据是否选中来切换样式
-                    color={selected_subject_id === subject.id ? "primary" : "default"} // 选中的按钮使用不同颜色
-                    onClick={() => handleSubjectSelect(subject)}>
+                    variant={selected_subject_id === subject.id ? "contained" : "outlined"} 
+                    // 根据是否选中来切换样式
+                    color={selected_subject_id === subject.id ? "primary" : "default"} 
+                    // 选中的按钮使用不同颜色
+                    onClick={() => handleSubjectSelect(subject)}
+                    //设置了主题，这样提交问题时只会检索对应主题下的向量
+                  >
+                    {/* 前面是Button样式，后面是Button内容：被渲染的主题名 */}
                     {subject.subject_name}
                   </Button>
                 </Box>
