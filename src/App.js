@@ -175,6 +175,8 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      console.log(apiUrl);
+      console.log(process.env.REACT_APP_API_URL);
       axios.get(`${apiUrl}/subjects`)
         .then(response => {
           setSubjects(response.data);
