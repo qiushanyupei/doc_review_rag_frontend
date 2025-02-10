@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React,{ useState, useEffect } from 'react';
 import { Box, Typography, TextField, IconButton,Button } from '@mui/material';
-import { ResizableBox } from 'react-resizable';
 import {Description as DescriptionIcon, SmartToy as SmartToyIcon} from '@mui/icons-material';
 import SubjectIcon from '@mui/icons-material/Subject';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import 'react-resizable/css/styles.css'; // 引入样式
 import mammoth from 'mammoth'; // 用于解析 .docx 文档
-import CircularProgress from '@mui/material/CircularProgress';
 import * as pdfjsLib from 'pdfjs-dist';
 import axios from 'axios';
+import ResizablePanel from './components/ResizablePanel';
+import AiInteraction from './components/AiInteraction';
+import SubjectSelect from './components/SubjectSelect';
+import DocumentPreview from './components/DocumentPreview';
 
 function App() {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
@@ -16,17 +17,18 @@ function App() {
   const [leftWidth, setLeftWidth] = useState(windowWidth * leftRatio); // 左侧宽度
   const [rightWidth, setRightWidth] = useState(windowWidth * (1 - leftRatio)); // 右侧宽度
   const [documentContent, setDocumentContent] = useState('这里将显示文档内容。'); // 左侧文档内容
-  const [userQuestion, setUserQuestion] = useState(''); // 用户输入的问题
   const [aiResponse, setAiResponse] = useState('AI反馈内容将在这里显示。'); // AI 的回答
+  const [userQuestion, setUserQuestion] = useState(''); // 用户输入的问题
   const [loading, setLoading] = useState(false); // 加载状态
   const [question, setQuestion] = useState('');
   const [subjects, setSubjects] = useState([]);
   const [selected_subject_id, setSelected_Subject_Id] = useState(0);
   pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
 
+
   // 动态监听窗口大小变化
   useEffect(() => {
-    const handleResize = () => {
+      const handleResize = () => {
       const newWindowWidth = window.innerWidth;
 
       // 根据比例调整左右宽度
@@ -34,14 +36,14 @@ function App() {
       setRightWidth(newWindowWidth * (1 - leftRatio));
 
       setWindowWidth(newWindowWidth); // 更新窗口宽度
-    };
+      };
 
-    //首次挂载到页面时会添加监视器，所以不用担心没有被初始化
-    window.addEventListener('resize', handleResize);
+      //首次挂载到页面时会添加监视器，所以不用担心没有被初始化
+      window.addEventListener('resize', handleResize);
 
-    return () => {
+      return () => {
       window.removeEventListener('resize', handleResize);
-    };
+      };
   }, [leftRatio]);
 
   // 动态调整发给后端的问题
@@ -51,18 +53,74 @@ function App() {
     setQuestion(userQuestion);
   }, [userQuestion]);
 
+  //用于每隔5秒获取数据库更新好的主题信息
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      console.log(apiUrl);
+      console.log(process.env.REACT_APP_API_URL);
+      axios.get(`${apiUrl}/subjects`)
+        .then(response => {
+          setSubjects(response.data);
+          console.log('Request success');
+        })
+        .catch(error => {
+          console.error(error);
+        });
+    }, 5000);  // 每5秒钟请求一次
+  
+    // 清理定时器
+    return () => clearInterval(interval);
+  }, []); 
+
   // 拖动分隔条后更新比例和宽度
   //左侧ResizableBox的onResizeStop监听
   //即resize停止后进行更新
   //参数e是点击事件
   //data是包含尺寸和位置信息的对象
   const handleResizeStop = (e, data) => {
-    const newLeftWidth = data.size.width;
-    const newLeftRatio = newLeftWidth / window.innerWidth;
+      const newLeftWidth = data.size.width;
+      const newLeftRatio = newLeftWidth / window.innerWidth;
 
-    setLeftRatio(newLeftRatio); // 更新比例
-    setLeftWidth(newLeftWidth); // 更新左侧宽度
-    setRightWidth(window.innerWidth - newLeftWidth); // 更新右侧宽度
+      setLeftRatio(newLeftRatio); // 更新比例
+      setLeftWidth(newLeftWidth); // 更新左侧宽度
+      setRightWidth(window.innerWidth - newLeftWidth); // 更新右侧宽度
+  };
+
+  //绑定于上传问题
+  const handleQuestionSubmit = async () => {
+    if (!userQuestion.trim()) {
+      alert('请输入一个问题！');
+      return;
+    }
+
+    if (selected_subject_id === 0){
+      alert('请选择一个主题！');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      const response = await fetch(`${apiUrl}/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: question,Id: selected_subject_id     }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAiResponse(data.answer || '未收到有效的回答。');
+      } else {
+        setAiResponse('请求失败，请稍后再试。');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      setAiResponse('连接后端失败，请检查服务是否正常运行。');
+    }
+
+    setLoading(false);
   };
 
   // 文件上传处理
@@ -135,62 +193,6 @@ function App() {
     return textContent;
   };
 
-  //绑定于上传问题
-  const handleQuestionSubmit = async () => {
-    if (!userQuestion.trim()) {
-      alert('请输入一个问题！');
-      return;
-    }
-
-    if (selected_subject_id === 0){
-      alert('请选择一个主题！');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
-      const response = await fetch(`${apiUrl}/query`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question,Id: selected_subject_id     }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAiResponse(data.answer || '未收到有效的回答。');
-      } else {
-        setAiResponse('请求失败，请稍后再试。');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      setAiResponse('连接后端失败，请检查服务是否正常运行。');
-    }
-
-    setLoading(false);
-  };
-
-  //用于每隔5秒获取数据库更新好的主题信息
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
-      console.log(apiUrl);
-      console.log(process.env.REACT_APP_API_URL);
-      axios.get(`${apiUrl}/subjects`)
-        .then(response => {
-          setSubjects(response.data);
-          console.log('Request success');
-        })
-        .catch(error => {
-          console.error(error);
-        });
-    }, 5000);  // 每5秒钟请求一次
-  
-    // 清理定时器
-    return () => clearInterval(interval);
-  }, []); 
-
   const handleSubjectSelect = (s_subject) => {
     setSelected_Subject_Id(s_subject.id)
   };
@@ -205,216 +207,15 @@ function App() {
       }}
     >
       {/* 左侧区域：文档显示 */}
-      <ResizableBox
-        //width会根据leftWidth的值动态渲染
-        width={leftWidth}
-        height={Infinity}
-        //以下只能水平拖动
-        axis="x"
-        //constraint[宽度，高度]
-        minConstraints={[windowWidth * 0.2, 100]} // 最小宽度限制 20%
-        maxConstraints={[windowWidth * 0.8, Infinity]} // 最大宽度限制 80%
-        //e代指east,可以从右边拖动边界
-        //不过有偏移量所以也无所谓
-        resizeHandles={['e']}
-        onResizeStop={handleResizeStop}
-        //handle是拖动的把手
-        handle={
-          <div
-            style={{
-              width: '100px', // 拖动区域宽度
-              height: '100%',
-              position: 'absolute',
-              top: 0,
-              right: -50,
-              cursor: 'ew-resize', // 鼠标指针样式
-              zIndex: 10,
-              backgroundColor: 'transparent', // 可选：设为透明
-            }}
-          />
-        }
-        style={{
-          backgroundColor: '#fafafa',
-          borderRadius: '10px',
-          //参数解释
-          //水平偏移、垂直偏移、模糊半径、阴影颜色和透明度
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-          //内边距（和内部组件的距离）
-          padding: '20px',
-          display: 'flex',
-          //元素垂直排布
-          flexDirection: 'column',
-          //外边距
-          marginRight: '20px',
-        }}
-      >
-        <Box sx={{ flex: 1, marginBottom: '20px' }}>
-          {/* alignItems: 'center'是垂直对齐子元素 */}
-          <Box sx={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-            {/* DescriptionIcon就是文件图标 */}
-            <DescriptionIcon color="primary" sx={{ marginRight: '10px' }} />
-            <Typography variant="h5">
-              文档预览
-            </Typography>
-          </Box>
-          <Box
-            //sx是MUI中的样式配置方法
-            sx={{
-              //flex:1是自动充满父容器
-              flex: 1,
-              border: '1px solid #ddd',
-              padding: '10px',
-              borderRadius: '8px',
-              background: '#ffffff',
-              overflowY: 'auto',
-              maxHeight: '30vh',
-              minHeight: '30vh'
-            }}
-          >
-            <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-              {documentContent}
-            </Typography>
-            {/* <TextField
-              multiline
-              fullWidth
-              minRows={5}
-              variant="standard"
-              value={documentContent}
-              onChange={(e) => setDocumentContent(e.target.value)} // 更新预览内容
-              sx={{
-                whiteSpace: 'pre-wrap', // 保留格式
-                wordWrap: 'break-word',
-                '& .MuiInput-underline:before': {
-                  borderBottom: 'none', // 去掉默认的底部边界线
-                },
-                '& .MuiInput-underline:hover:before': {
-                  borderBottom: 'none', // 去掉 hover 状态下的底部边界线
-                },
-                '& .MuiInput-underline:after': {
-                  borderBottom: 'none', // 去掉聚焦状态下的底部边界线
-                },
-              }}
-            /> */}
-          </Box>
-          {/* variant是MUI中控制外观样式的属性 */}
-          {/* component=‘label’是通过button联动触发input */}
-          <Button variant="outlined" component="label" sx={{ marginTop: '20px' }}>
-            上传文件
-            <input
-              type="file"
-              hidden
-              accept=".txt,.docx,.pdf"
-              onChange={handleFileUpload}
-            />
-          </Button>
-        </Box>
+      <ResizablePanel leftWidth={leftWidth} windowWidth={windowWidth} handleResizeStop={handleResizeStop}>
+        <DocumentPreview documentContent={documentContent} handleFileUpload={handleFileUpload} />
         {/* 下半部分：主题选择部分 */}
         {/* flex:1表示既能伸展又能收缩，如果为其他数字基本用不到，设置在总份中的比例 */}
-        <Box sx={{ flex: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-            <SubjectIcon color="primary" sx={{ marginRight: '10px' }} />
-            <Typography variant="h5">选择主题</Typography>
-          </Box>
-          <Box
-            sx={{
-              flex: 1,
-              border: '1px solid #ddd',
-              padding: '10px',
-              borderRadius: '8px',
-              background: '#ffffff',
-              overflowY: 'auto',
-              maxHeight: '30vh',
-              minHeight: '20vh'
-            }}
-          >
-            <Typography variant="body2" color="textSecondary">
-              {/* 渲染从数据库获取的主题列表 */}
-              {/* 主题列表中每个主题渲染为一个Box嵌套Button */}
-              {subjects?.map((subject) => (
-                <Box key={subject.id} mb={2}>
-                  {/* mb是指margin bottom */}
-                  <Button 
-                    variant={selected_subject_id === subject.id ? "contained" : "outlined"} 
-                    // 根据是否选中来切换样式
-                    color={selected_subject_id === subject.id ? "primary" : "default"} 
-                    // 选中的按钮使用不同颜色
-                    onClick={() => handleSubjectSelect(subject)}
-                    //设置了主题，这样提交问题时只会检索对应主题下的向量
-                  >
-                    {/* 前面是Button样式，后面是Button内容：被渲染的主题名 */}
-                    {subject.subject_name}
-                  </Button>
-                </Box>
-              ))}
-            </Typography>
-          </Box>
-        </Box>
-      </ResizableBox>
+        <SubjectSelect subjects={subjects} selected_subject_id={selected_subject_id} handleSubjectSelect={handleSubjectSelect}/>
+      </ResizablePanel>
 
       {/* 右侧区域：AI交互区 */}
-      <Box
-        sx={{
-          padding: '20px',
-          backgroundColor: '#fafafa',
-          borderRadius: '10px',
-          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          flexDirection: 'column',
-          //自动充满父容器
-          flex: 1,
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', marginBottom: '10px' }}>
-          <SmartToyIcon color="primary" sx={{ marginRight: '10px' }} />
-          <Typography variant="h5">
-            AI交互区
-          </Typography>
-        </Box>
-        <Box
-          sx={{
-            flex: 1,
-            border: '1px solid #ddd',
-            padding: '10px',
-            borderRadius: '8px',
-            background: '#ffffff',
-            overflowY: 'auto',
-          }}
-        >
-          <Typography variant="body2" color="textSecondary" sx={{ whiteSpace: 'pre-wrap' }}>
-            {aiResponse}
-          </Typography>
-        </Box>
-
-        {/* 输入框和发送图标按钮 */}
-        {/* flex默认是水平排布 */}
-        {/* gap表示两个相邻组件之间的间距 */}
-        <Box sx={{ marginTop: '20px', display: 'flex', gap: 2 }}>
-          <TextField
-            label="输入内容"
-            variant="outlined"
-            fullWidth
-            size="small"
-            placeholder="在这里输入想分析的内容"
-            value={userQuestion}
-            onChange={(e)=>setUserQuestion(e.target.value)}
-          />
-          <IconButton
-            size="large"
-            sx={{
-              backgroundColor: '#1976d2',
-              color: '#fff',
-              ':hover': {
-                backgroundColor: '#115293',
-              },
-            }}
-            onClick={handleQuestionSubmit}
-            //disabled=true时不能点击
-            disabled={loading}
-          >
-            {loading ? <CircularProgress size={24} /> :<ArrowForwardIcon sx={{ transform: 'rotate(-90deg)' }}/>}
-          </IconButton>
-        </Box>
-      </Box>
+      <AiInteraction aiResponse={aiResponse} userQuestion={userQuestion}  setUserQuestion={setUserQuestion} handleQuestionSubmit={handleQuestionSubmit} loading = {loading}/>
     </Box>
   );
 }
