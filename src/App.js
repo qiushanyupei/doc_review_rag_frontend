@@ -158,7 +158,11 @@ function App() {
     setDocumentContent(newDocumentContent);
 
     try {
+      console.log("fuck you")
+      console.log(process.env.REACT_APP_API_URL)
+      console.log("i like your ass")
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';  // 使用环境变量
+      console.log(`${apiUrl}/upload`)
       const response = await fetch(`${apiUrl}/upload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
